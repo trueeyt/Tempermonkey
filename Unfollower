@@ -1,0 +1,128 @@
+// ==UserScript==
+// @name         Auto Unfollow Script for Bluesky
+// @namespace    http://tampermonkey.net/
+// @version      1.7
+// @description  Script para dar unfollow automaticamente em qualquer página do Bluesky onde botões "Unfollow" sejam encontrados, com a opção de parar o processo através de um botão na página.
+// @author       Seu Nome
+// @match        https://bsky.app/profile/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let stopUnfollow = false; // Variável para controlar se o script deve parar
+
+    // Função para criar o botão de parar na página
+    function createStopButton() {
+        // Botão de parar
+        const stopButton = document.createElement('button');
+        stopButton.innerText = 'Parar Unfollow';
+        stopButton.style.position = 'fixed';
+        stopButton.style.top = '10px';
+        stopButton.style.right = '10px';
+        stopButton.style.zIndex = '9999';
+        stopButton.style.padding = '10px 20px';
+        stopButton.style.backgroundColor = '#000';
+        stopButton.style.color = '#fff';
+        stopButton.style.border = 'none';
+        stopButton.style.cursor = 'pointer';
+        stopButton.style.fontSize = '16px';
+
+        // Adiciona o evento de clique para parar o processo de unfollow
+        stopButton.addEventListener('click', () => {
+            stopUnfollow = true; // Define para parar o script
+            console.log('Processo de Unfollow interrompido pelo usuário.');
+        });
+
+        document.body.appendChild(stopButton);
+    }
+
+    // Função que realiza o processo de unfollow
+    function unfollowProcess() {
+        let clickCount = 0; // Contador de cliques
+        const maxClicks = 2000; // Limite de cliques por execução
+
+        // Função para exibir o número de cliques a cada 2 minutos
+        function logClickCount() {
+            console.log(`Total de cliques efetuados até agora: ${clickCount}`);
+            if (clickCount < maxClicks && !stopUnfollow) {
+                setTimeout(logClickCount, 120000); // Executa novamente após 2 minutos (120000ms) se ainda não atingiu o limite e não foi parado
+            }
+        }
+
+        // Inicia o log de cliques a cada 2 minutos
+        setTimeout(logClickCount, 120000); // Começa a contar 2 minutos após o início
+
+        function clickAllUnfollowButtons() {
+            // Verifica se o script foi interrompido pelo usuário
+            if (stopUnfollow) {
+                console.log("O script foi interrompido pelo usuário.");
+                return;
+            }
+
+            // Verifica se o número máximo de cliques foi atingido
+            if (clickCount >= maxClicks) {
+                console.log(`Limite de ${maxClicks} cliques atingido. O script será interrompido.`);
+                return; // Para o script quando o limite for atingido
+            }
+
+            // Seleciona todos os botões 'Unfollow' visíveis na página
+            const buttons = document.querySelectorAll('button');
+            let unfollowButtons = Array.from(buttons).filter(button => button.innerText.trim().toLowerCase() === 'unfollow'); // Filtra apenas os botões de 'Unfollow'
+
+            if (unfollowButtons.length > 0) {
+                // Clica em todos os botões de 'Unfollow' visíveis
+                unfollowButtons.forEach((button, index) => {
+                    if (clickCount < maxClicks && !stopUnfollow) { // Apenas clica se ainda não atingiu o limite e não foi parado
+                        button.click();
+                        clickCount++; // Incrementa o contador de cliques
+                        console.log(`Clicando no botão de Unfollow ${index + 1}. Total até agora: ${clickCount}`);
+                    }
+                });
+
+                // Após clicar em todos os botões visíveis, rola a página para carregar mais perfis
+                setTimeout(() => {
+                    if (!stopUnfollow) {
+                        console.log("Descendo a página para carregar mais perfis...");
+                        window.scrollTo(0, document.body.scrollHeight);
+                        setTimeout(clickAllUnfollowButtons, 2000); // Espera 2 segundos para tentar novamente
+                    }
+                }, 2000);
+
+            } else {
+                // Não há mais botões visíveis, tenta descer a página novamente
+                console.log("Nenhum botão de Unfollow encontrado. Verificando se mais perfis serão carregados...");
+
+                // Rola a página para garantir que todos os elementos possíveis sejam carregados
+                window.scrollTo(0, document.body.scrollHeight);
+
+                // Espera um pouco para verificar se novos elementos aparecem
+                setTimeout(() => {
+                    const newButtons = document.querySelectorAll('button');
+                    let newUnfollowButtons = Array.from(newButtons).filter(button => button.innerText.trim().toLowerCase() === 'unfollow');
+
+                    if (newUnfollowButtons.length === 0) {
+                        // Se após rolar a página não houver mais botões, recarrega a página
+                        console.log("Ainda não há botões de Unfollow disponíveis. Recarregando a página...");
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        // Se encontrar novos botões, retoma o processo de clicar
+                        clickAllUnfollowButtons();
+                    }
+                }, 3000); // Aguarda 3 segundos para verificar novos elementos
+            }
+        }
+
+        clickAllUnfollowButtons();
+    }
+
+    // Cria o botão de parar ao carregar a página
+    createStopButton();
+
+    // Inicia o processo de unfollow automaticamente
+    unfollowProcess();
+
+})();
